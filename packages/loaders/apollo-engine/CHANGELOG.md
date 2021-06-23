@@ -1,5 +1,33 @@
 # @graphql-tools/apollo-engine-loader
 
+## 7.0.0
+
+### Major Changes
+
+- e01d6b9e: BREAKING CHANGE
+  - Now it uses the native [`AggregateError`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AggregateError) implementation. The major difference is the individual errors are kept under `errors` property instead of the object itself with `Symbol.iterator`.
+  ```js
+  // From;
+  for (const error of aggregateError)
+  // To;
+  for (const error of aggregateError.errors)
+  ```
+
+### Minor Changes
+
+- a31f9593: feat(apollo-engine): add sync support
+
+### Patch Changes
+
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [982c8f53]
+- Updated dependencies [e01d6b9e]
+  - @graphql-tools/utils@8.0.0
+
 ## 6.2.5
 
 ### Patch Changes

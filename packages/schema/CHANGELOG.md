@@ -1,5 +1,37 @@
 # @graphql-tools/schema
 
+## 8.0.0
+
+### Major Changes
+
+- e01d6b9e: BREAKING CHANGE
+  - Legacy Schema Directives and Directive Resolvers have been removed
+  - - You can check the new method for both;
+  - - - https://www.graphql-tools.com/docs/schema-directives
+- e01d6b9e: BREAKING CHANGE
+  - Remove `logger` and `addErrorLoggingToSchema`
+  - - You can implement logging and debugging mechanism outside the resolvers using some kind of plugin system based library like [Envelop](https://www.envelop.dev/docs/core#uselogger)
+- e01d6b9e: BREAKING CHANGE
+  - Remove schema level resolvers feature and `addSchemaLevelResolver`
+  - - You can wrap your resolvers by using [Resolvers Composition](https://www.graphql-tools.com/docs/resolvers-composition)
+- e01d6b9e: BREAKING CHANGE
+  - No longer exports `buildSchemaFromTypeDefinitions`, use `buildSchema` from `graphql-js` instead
+  - Remove `allowUndefinedResolve` option in `makeExecutableSchema` because GraphQL Schema itself does this checking
+
+### Patch Changes
+
+- e01d6b9e: enhance(schema): use merge package to handle typeDefs and resolvers merging
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [982c8f53]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [a31f9593]
+  - @graphql-tools/utils@8.0.0
+  - @graphql-tools/merge@6.2.15
+
 ## 7.1.5
 
 ### Patch Changes

@@ -1,5 +1,35 @@
 # @graphql-tools/delegate
 
+## 8.0.0
+
+### Major Changes
+
+- e01d6b9e: BREAKING CHANGE
+  - Now it uses the native [`AggregateError`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AggregateError) implementation. The major difference is the individual errors are kept under `errors` property instead of the object itself with `Symbol.iterator`.
+  ```js
+  // From;
+  for (const error of aggregateError)
+  // To;
+  for (const error of aggregateError.errors)
+  ```
+
+### Patch Changes
+
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [982c8f53]
+- Updated dependencies [e01d6b9e]
+- Updated dependencies [e01d6b9e]
+  - @graphql-tools/utils@8.0.0
+  - @graphql-tools/schema@8.0.0
+  - @graphql-tools/batch-execute@7.1.3
+
 ## 7.1.5
 
 ### Patch Changes

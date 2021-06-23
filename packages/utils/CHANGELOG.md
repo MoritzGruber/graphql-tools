@@ -1,5 +1,36 @@
 # @graphql-tools/utils
 
+## 8.0.0
+
+### Major Changes
+
+- e01d6b9e: BREAKING CHANGE
+  - Remove `fieldToFieldConfig`, `argsToFieldConfigArgument` and `argumentToArgumentConfig`
+  - - You can use `.toConfig` method instead for each.
+- e01d6b9e: BREAKING CHANGE
+  - Legacy Schema Directives and Directive Resolvers have been removed
+  - - You can check the new method for both;
+  - - - https://www.graphql-tools.com/docs/schema-directives
+- e01d6b9e: BREAKING CHANGE
+  - Now it uses the native [`AggregateError`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AggregateError) implementation. The major difference is the individual errors are kept under `errors` property instead of the object itself with `Symbol.iterator`.
+  ```js
+  // From;
+  for (const error of aggregateError)
+  // To;
+  for (const error of aggregateError.errors)
+  ```
+- e01d6b9e: BREAKING CHANGE
+  - No longer exports `debugLog` but uses `console.log` directly only if `DEBUG` is available under `process.env`
+- e01d6b9e: BREAKING CHANGE
+  - No longer applies `camelCase` naming convention in `buildOperationNodeForField`
+- e01d6b9e: BREAKING CHANGE
+  - No longer exports `SchemaVisitor`, `visitSchema` and `VisitSchemaKind`
+  - - Use [`mapSchema`](https://www.graphql-tools.com/docs/schema-directives/#full-mapschema-api) instead
+
+### Patch Changes
+
+- 982c8f53: enhance(utils): refactor, cleanup and remove extra work
+
 ## 7.10.0
 
 ### Minor Changes
