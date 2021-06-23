@@ -1,6 +1,6 @@
 /* eslint-disable no-case-declarations */
 /// <reference lib="dom" />
-import { print, IntrospectionOptions, Kind, GraphQLError } from 'graphql';
+import { print, IntrospectionOptions, Kind, GraphQLError, DocumentNode } from 'graphql';
 
 import {
   AsyncExecutor,
@@ -20,7 +20,7 @@ import {
   Maybe,
 } from '@graphql-tools/utils';
 import { isWebUri } from 'valid-url';
-import { fetch as crossFetch } from 'cross-fetch';
+import { fetch as crossFetch, Headers } from 'cross-fetch';
 import { SubschemaConfig } from '@graphql-tools/delegate';
 import { introspectSchema, wrapSchema } from '@graphql-tools/wrap';
 import { ClientOptions, createClient } from 'graphql-ws';
@@ -29,7 +29,9 @@ import syncFetch from 'sync-fetch';
 import isPromise from 'is-promise';
 import { extractFiles, isExtractableFile } from 'extract-files';
 import FormData from 'form-data';
-import { fetchEventSource, FetchEventSourceInit } from '@microsoft/fetch-event-source';
+import '@ardatan/eventsource';
+import { Subscription, SubscriptionOptions } from 'sse-z';
+import { URL } from 'url';
 import { ConnectionParamsOptions, SubscriptionClient as LegacySubscriptionClient } from 'subscriptions-transport-ws';
 import AbortController from 'abort-controller';
 import { meros } from 'meros';
@@ -121,7 +123,7 @@ export interface LoadFromUrlOptions extends SingleFileOptions, Partial<Introspec
   /**
    * Additional options to pass to the constructor of the underlying EventSource instance.
    */
-  eventSourceOptions?: FetchEventSourceInit;
+  eventSourceOptions?: SubscriptionOptions['eventSourceOptions'];
   /**
    * Handle URL as schema SDL
    */
@@ -206,39 +208,6 @@ export class UrlLoader implements DocumentLoader<LoadFromUrlOptions> {
     return form;
   }
 
-  prepareGETUrl({
-    baseUrl,
-    query,
-    variables,
-    operationName,
-  }: {
-    baseUrl: string;
-    query: string;
-    variables: any;
-    operationName?: string;
-  }) {
-    const HTTP_URL = switchProtocols(baseUrl, {
-      wss: 'https',
-      ws: 'http',
-    });
-    const dummyHostname = 'https://dummyhostname.com';
-    const validUrl = HTTP_URL.startsWith('http')
-      ? HTTP_URL
-      : HTTP_URL.startsWith('/')
-      ? `${dummyHostname}${HTTP_URL}`
-      : `${dummyHostname}/${HTTP_URL}`;
-    const urlObj = new URL(validUrl);
-    urlObj.searchParams.set('query', query);
-    if (variables && Object.keys(variables).length > 0) {
-      urlObj.searchParams.set('variables', JSON.stringify(variables));
-    }
-    if (operationName) {
-      urlObj.searchParams.set('operationName', operationName);
-    }
-    const finalUrl = urlObj.toString().replace(dummyHostname, '');
-    return finalUrl;
-  }
-
   buildExecutor(options: BuildExecutorOptions<SyncFetchFn>): SyncExecutor;
   buildExecutor(options: BuildExecutorOptions<AsyncFetchFn>): AsyncExecutor;
   buildExecutor({
@@ -277,7 +246,14 @@ export class UrlLoader implements DocumentLoader<LoadFromUrlOptions> {
       const query = print(document);
       switch (method) {
         case 'GET':
-          const finalUrl = this.prepareGETUrl({ baseUrl: pointer, query, variables });
+          const dummyHostname = 'https://dummyhostname.com';
+          const validUrl = HTTP_URL.startsWith('http') ? HTTP_URL : `${dummyHostname}/${HTTP_URL}`;
+          const urlObj = new URL(validUrl);
+          urlObj.searchParams.set('query', query);
+          if (variables && Object.keys(variables).length > 0) {
+            urlObj.searchParams.set('variables', JSON.stringify(variables));
+          }
+          const finalUrl = urlObj.toString().replace(dummyHostname, '');
           fetchResult = fetch(finalUrl, {
             method: 'GET',
             credentials: 'include',
@@ -423,58 +399,34 @@ export class UrlLoader implements DocumentLoader<LoadFromUrlOptions> {
     };
   }
 
-  buildSSESubscriber(
-    pointer: string,
-    extraHeaders: Maybe<Headers>,
-    fetch: AsyncFetchFn,
-    options: Maybe<FetchEventSourceInit>
-  ): Subscriber {
-    return async ({ document, variables, ...rest }) => {
-      const controller = new AbortController();
+  buildSSESubscriber(pointer: string, eventSourceOptions?: SubscriptionOptions['eventSourceOptions']): Subscriber {
+    return async ({ document, variables }: { document: DocumentNode; variables?: any }) => {
       const query = print(document);
-      const finalUrl = this.prepareGETUrl({ baseUrl: pointer, query, variables });
-      const headers = this.getHeadersFromOptions(extraHeaders, {
-        document,
-        variables,
-        ...rest,
-      });
       return observableToAsyncIterable({
         subscribe: observer => {
-          fetchEventSource(finalUrl, {
-            credentials: 'include',
-            headers,
-            method: 'GET',
-            onerror: error => {
-              observer.error(error);
+          const subscription = new Subscription({
+            url: pointer,
+            searchParams: {
+              query,
+              ...(variables ? { variables: JSON.stringify(variables) } : {}),
             },
-            onmessage: event => {
-              observer.next(JSON.parse(event.data || '{}'));
+            eventSourceOptions: {
+              // Ensure cookies are included with the request
+              withCredentials: true,
+              ...eventSourceOptions,
             },
-            onopen: async response => {
-              const contentType = response.headers.get('content-type');
-              if (!contentType?.startsWith('text/event-stream')) {
-                let error;
-                try {
-                  const { errors } = await response.json();
-                  error = errors[0];
-                } catch (error) {
-                  // Failed to parse body
-                }
-
-                if (error) {
-                  throw error;
-                }
-
-                throw new Error(`Expected content-type to be ${'text/event-stream'} but got "${contentType}".`);
-              }
+            onNext: data => {
+              const parsedData = JSON.parse(data);
+              observer.next(parsedData);
             },
-            fetch,
-            signal: controller.signal,
-            ...options,
+            onError: data => {
+              observer.error(data);
+            },
+            onComplete: () => {
+              observer.complete();
+            },
           });
-          return {
-            unsubscribe: () => controller.abort(),
-          };
+          return subscription;
         },
       });
     };
@@ -506,7 +458,7 @@ export class UrlLoader implements DocumentLoader<LoadFromUrlOptions> {
         return customFetch as any;
       }
     }
-    return async ? (typeof fetch === 'undefined' ? crossFetch : fetch) : syncFetch;
+    return async ? crossFetch : syncFetch;
   }
 
   private getHeadersFromOptions(
@@ -576,7 +528,7 @@ export class UrlLoader implements DocumentLoader<LoadFromUrlOptions> {
 
     const subscriptionsEndpoint = options.subscriptionsEndpoint || pointer;
     if (options.useSSEForSubscription) {
-      subscriber = this.buildSSESubscriber(subscriptionsEndpoint, options.headers, fetch, options.eventSourceOptions);
+      subscriber = this.buildSSESubscriber(subscriptionsEndpoint, options.eventSourceOptions);
     } else {
       const webSocketImpl = await this.getWebSocketImpl(options, asyncImport);
       const connectionParams = () => ({ headers: this.getHeadersFromOptions(options.headers, {} as any) });
@@ -611,14 +563,7 @@ export class UrlLoader implements DocumentLoader<LoadFromUrlOptions> {
     const subscriptionsEndpoint = options.subscriptionsEndpoint || pointer;
     let subscriber: Subscriber;
     if (options.useSSEForSubscription) {
-      const asyncFetchFn: any = (...args: any[]) =>
-        this.getFetch(options?.customFetch, asyncImport, true).then((asyncFetch: any) => asyncFetch(...args));
-      subscriber = this.buildSSESubscriber(
-        subscriptionsEndpoint,
-        options.headers,
-        asyncFetchFn,
-        options.eventSourceOptions
-      );
+      subscriber = this.buildSSESubscriber(subscriptionsEndpoint, options.eventSourceOptions);
     } else {
       const webSocketImpl = this.getWebSocketImpl(options, syncImport);
       const connectionParams = () => ({ headers: this.getHeadersFromOptions(options.headers, {} as any) });
